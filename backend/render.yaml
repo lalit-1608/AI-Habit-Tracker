@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: ai-habit-tracker-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        generateValue: false   # Render sets this automatically
+      - key: MONGO_URI
+        sync: false            # Fill in Render dashboard
+      - key: JWT_SECRET
+        generateValue: true    # Render auto-generates a secure value
+      - key: JWT_EXPIRES_IN
+        value: 30d
+      - key: GEMINI_API_KEY
+        sync: false            # Fill in Render dashboard
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: CLIENT_URL
+        sync: false            # Fill in Render dashboard (your frontend URL)
+    healthCheckPath: /api/health
