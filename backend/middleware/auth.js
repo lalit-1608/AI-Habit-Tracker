@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import { isDbConnected } from "../config/db.js";
 
 /**
  * protect — verifies the Bearer JWT and attaches req.user.
@@ -12,6 +13,12 @@ import User from "../models/User.js";
  */
 export const protect = async (req, res, next) => {
     try {
+        if (!isDbConnected()) {
+            return res.status(503).json({
+                message: "Authentication service unavailable. Please try again later.",
+            });
+        }
+
         let token;
 
         if (
@@ -47,6 +54,17 @@ export const protect = async (req, res, next) => {
                 .status(401)
                 .json({ message: "Session expired, please log in again" });
         }
+
+        if (
+            err.name === "MongooseServerSelectionError" ||
+            err.name === "MongoNetworkTimeoutError" ||
+            err.name === "MongoServerSelectionError"
+        ) {
+            return res.status(503).json({
+                message: "Database unavailable. Please try again later.",
+            });
+        }
+
         return res.status(401).json({ message: "Not authorized, token invalid" });
     }
 };

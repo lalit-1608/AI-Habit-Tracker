@@ -1,16 +1,25 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+const FALLBACK_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+];
+
+const resolveModelName = () => {
+    const configured = process.env.GEMINI_MODEL?.trim();
+    if (configured) return configured;
+    return FALLBACK_MODELS[0];
+};
+
 let client = null;
 const getClient = () => {
     if (client) return client;
     const key = process.env.GEMINI_API_KEY;
     if (!key) return null;
-    // FIX: GoogleGenerativeAI constructor takes the API key string directly, not an object
     client = new GoogleGenerativeAI(key);
     return client;
 };
-
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 export const isAIEnabled = () => !!process.env.GEMINI_API_KEY;
 
@@ -24,36 +33,51 @@ export const parseJSON = (text) => {
     return JSON.parse(cleaned.trim())
 };
 
-export const chatCompletion = async ({ system, user, temperature = 0.7}) => {
+export const chatCompletion = async ({ system, user, temperature = 0.7 }) => {
     const c = getClient();
     if (!c) {
         return {
             ok: false,
             content:
-            "AI feature are disabled - set GEMINI_API_KEY in the backend .env to enable real AI responses. Meanwhile, here is a fun placeholder response: " 
+                "AI is disabled — set GEMINI_API_KEY in the backend .env to enable real AI responses."
         };
     }
-    try {
-        const model = c.getGenerativeModel({ model: MODEL });
-        const result = await model.generateContent({
-            contents: [{
-                role: "user",
-                parts: [{
-                    text: `${system}\n\n${user}`
-                }]
-            }],
-            generationConfig: {
-                temperature,
-                maxOutputTokens: 1024,
+
+    const candidateModels = [resolveModelName(), ...FALLBACK_MODELS.filter((m) => m !== resolveModelName())];
+
+    for (const modelName of candidateModels) {
+        try {
+            const model = c.getGenerativeModel({ model: modelName });
+            const result = await model.generateContent({
+                contents: [{
+                    role: "user",
+                    parts: [{
+                        text: `${system}\n\n${user}`
+                    }]
+                }],
+                generationConfig: {
+                    temperature,
+                    maxOutputTokens: 1024,
+                }
+            });
+
+            const text = await result.response.text();
+            return { ok: true, content: (text || "").trim() };
+        } catch (err) {
+            const message = err?.message || "Unknown AI error";
+            const likelyModelIssue = /model.*not found|unsupported.*model|invalid.*model|404/i.test(message);
+            if (!likelyModelIssue) {
+                console.error("AI error:", message);
+                return { ok: false, content: "AI request failed. Please try again later." };
             }
-        });
-        
-        const text = result.response.text();
-        return { ok: true, content: (text || "").trim() };
-    } catch (err) {
-        console.error("AI error:", err.message);
-        return { ok: false, content: "AI request failed. please try again later." };
+            console.warn(`Falling back from model ${modelName}:`, message);
+        }
     }
+
+    return {
+        ok: false,
+        content: "AI request failed because the configured Gemini model is unavailable. Please update GEMINI_MODEL in backend/.env."
+    };
 };
 
 export const SYSTEM_PROMPTS = {

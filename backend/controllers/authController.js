@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import { isDbConnected } from "../config/db.js";
 
 /**
  * signToken — creates a signed HS256 JWT.
@@ -18,6 +19,12 @@ const sendToken = (res, statusCode, user) => {
 // ─── Register ─────────────────────────────────────────────────────────────────
 export const register = async (req, res) => {
     try {
+        if (!isDbConnected()) {
+            return res.status(503).json({
+                message: "Database unavailable. Please try again later.",
+            });
+        }
+
         const { name, email, password } = req.body;
 
         if (!name || !email || !password) {
@@ -38,6 +45,16 @@ export const register = async (req, res) => {
 
         sendToken(res, 201, user);
     } catch (err) {
+        if (
+            err.name === "MongooseServerSelectionError" ||
+            err.name === "MongoNetworkTimeoutError" ||
+            err.name === "MongoServerSelectionError"
+        ) {
+            return res.status(503).json({
+                message: "Database unavailable. Please try again later.",
+            });
+        }
+
         res.status(500).json({ message: err.message });
     }
 };
@@ -45,6 +62,12 @@ export const register = async (req, res) => {
 // ─── Login ────────────────────────────────────────────────────────────────────
 export const login = async (req, res) => {
     try {
+        if (!isDbConnected()) {
+            return res.status(503).json({
+                message: "Database unavailable. Please try again later.",
+            });
+        }
+
         const { email, password } = req.body;
 
         if (!email || !password) {
@@ -59,6 +82,16 @@ export const login = async (req, res) => {
 
         sendToken(res, 200, user);
     } catch (err) {
+        if (
+            err.name === "MongooseServerSelectionError" ||
+            err.name === "MongoNetworkTimeoutError" ||
+            err.name === "MongoServerSelectionError"
+        ) {
+            return res.status(503).json({
+                message: "Database unavailable. Please try again later.",
+            });
+        }
+
         res.status(500).json({ message: err.message });
     }
 };

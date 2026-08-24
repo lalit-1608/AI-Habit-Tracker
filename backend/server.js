@@ -74,8 +74,15 @@ app.use(errorHandler);
 // PORT is set automatically by Render, Railway, Fly.io, etc.
 const PORT = process.env.PORT || 8000;
 
-connectDB().then(() => {
+const startServer = async () => {
+    const dbReady = await connectDB();
+    if (!dbReady) {
+        console.warn("Application started without MongoDB. API routes that require the database will return errors until MONGO_URI is configured.");
+    }
+
     app.listen(PORT, "0.0.0.0", () =>
         console.log(`Server running on port ${PORT}`)
     );
-});
+};
+
+startServer();
