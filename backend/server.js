@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import { connectDB } from "./config/db.js";
+import { connectDB, isDbConnected, getLastDbError } from "./config/db.js";
 import authRoutes from "./routes/auth.js";
 import habitRoutes from "./routes/habits.js";
 import logRoutes from "./routes/logs.js";
@@ -68,13 +68,34 @@ app.use("/api", apiLimiter);
 // ─── Health check ─────────────────────────────────────────────────────────────
 // Used by cloud platforms (Render, Railway, Fly.io, etc.) uptime checks
 app.get("/", (req, res) =>
-    res.json({ status: "ok", service: "ai-habit-tracker-backend", time: new Date().toISOString() })
+    res.json({
+        status: isDbConnected() ? "ok" : "degraded",
+        service: "ai-habit-tracker-backend",
+        database: isDbConnected() ? "connected" : "disconnected",
+        time: new Date().toISOString()
+    })
 );
 app.get("/health", (req, res) =>
-    res.json({ status: "ok", time: new Date().toISOString() })
+    res.json({
+        status: isDbConnected() ? "ok" : "degraded",
+        database: {
+            connected: isDbConnected(),
+            configured: !!process.env.MONGO_URI,
+            error: isDbConnected() ? null : (process.env.MONGO_URI ? getLastDbError() : "MONGO_URI is not set in environment variables"),
+        },
+        time: new Date().toISOString()
+    })
 );
 app.get("/api/health", (req, res) =>
-    res.json({ status: "ok", time: new Date().toISOString() })
+    res.json({
+        status: isDbConnected() ? "ok" : "degraded",
+        database: {
+            connected: isDbConnected(),
+            configured: !!process.env.MONGO_URI,
+            error: isDbConnected() ? null : (process.env.MONGO_URI ? getLastDbError() : "MONGO_URI is not set in environment variables"),
+        },
+        time: new Date().toISOString()
+    })
 );
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
