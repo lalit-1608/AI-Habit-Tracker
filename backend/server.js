@@ -23,28 +23,39 @@ app.use(helmet());
 // Accepts comma-separated list: https://myapp.vercel.app,https://myapp.com
 const allowedOrigins = (process.env.CLIENT_URL || "")
     .split(",")
-    .map((s) => s.trim())
+    .map((s) => s.trim().replace(/\/+$/, ""))
     .filter(Boolean);
 
 const corsOptions = {
     origin(origin, cb) {
-        // Allow server-to-server / curl with no Origin header
+        // Allow server-to-server / curl / mobile with no Origin header
         if (!origin) return cb(null, true);
+
+        const cleanOrigin = origin.replace(/\/+$/, "");
+
         // Always allow localhost in development
-        if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin)) {
             return cb(null, true);
         }
+
+        // Allow all if CLIENT_URL is empty or wildcard '*'
+        if (allowedOrigins.length === 0 || allowedOrigins.includes("*")) {
+            return cb(null, true);
+        }
+
         // Allow origins listed in CLIENT_URL env var
-        if (allowedOrigins.includes(origin)) return cb(null, true);
+        if (allowedOrigins.includes(cleanOrigin)) {
+            return cb(null, true);
+        }
+
         return cb(new Error(`Origin ${origin} not allowed by CORS`));
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
 };
 
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
 
 // ─── Body Parsing ─────────────────────────────────────────────────────────────
 app.use(express.json({ limit: "1mb" }));
@@ -55,7 +66,13 @@ app.use(preventHPP);
 app.use("/api", apiLimiter);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
-// Used by Render/Railway uptime checks — must return 200 quickly
+// Used by cloud platforms (Render, Railway, Fly.io, etc.) uptime checks
+app.get("/", (req, res) =>
+    res.json({ status: "ok", service: "ai-habit-tracker-backend", time: new Date().toISOString() })
+);
+app.get("/health", (req, res) =>
+    res.json({ status: "ok", time: new Date().toISOString() })
+);
 app.get("/api/health", (req, res) =>
     res.json({ status: "ok", time: new Date().toISOString() })
 );

@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema(
     },
     password: {type: String, required: true, minlength: 6 },
     avatar: {type: String, default: ""},
-    morningMotivation: {type: String, default: false},
+    morningMotivation: {type: Boolean, default: true},
 },
 {timestamps: true }
 );
